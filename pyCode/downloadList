@@ -1,0 +1,17 @@
+# 파이썬 코드 실행에 필요한 패키지 설치
+!apt-get update
+!apt-get install -y curl git build-essential
+!apt-get install -y openjdk-11-jdk     # Java Development Kit (JDK) 설치
+
+# JPype1 설치
+!pip install JPype1
+
+# konlpy 설치
+!pip install konlpy
+
+# chardet 라이브러리 설치
+!pip install chardet
+
+# 나눔고딕 폰트 설치
+!apt-get update -qq
+!apt-get install fonts-nanum* -qq
