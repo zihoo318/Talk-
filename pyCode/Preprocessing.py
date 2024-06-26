@@ -45,39 +45,38 @@ class ChatRoom:
         text = re.sub(r'--------------- \d{4}년 \d{1,2}월 \d{1,2}일 \w+ ---------------', '', text)
 
         # 정규 표현식을 사용하여 사용자별 메시지를 추출
-        lines = text.split('\n')
-        for line in lines:
-            match = re.match(r'\[(.+?)\] \[.+?\] (.+)', line)
-            if match:
-                user_name = match.group(1).strip() #보낸이
-                message = match.group(2).strip() #보낸 메세지
+        pattern = re.compile(r'\[(.+?)\] \[.+?\] (.+)')
+        matches = pattern.findall(text)
+        for match in matches:
+            user_name = match[0].strip()  # 보낸이
+            message = match[1].strip()  # 보낸 메세지
 
-                # 사용자 객체 생성 또는 가져오기
-                if user_name not in self.members:
-                    self.members[user_name] = User(user_name)
+            # 사용자 객체 생성 또는 가져오기
+            if user_name not in self.members:
+                self.members[user_name] = User(user_name)
 
-                user = self.members[user_name]
+            user = self.members[user_name]
 
-                # 형태소 분석 후 처리
-                tokens = self.okt.morphs(message)
-                for token in tokens:
-                    if self.is_jamo_only(token):
-                        user.typo_count += 1
-                    elif self.is_jamo(token):
-                      if not self.is_excluded_jamo(token):
-                            user.initial_message_count += 1
+            # 형태소 분석 후 처리
+            tokens = self.okt.morphs(message)
+            for token in tokens:
+                if self.is_jamo_only(token):
+                    user.typo_count += 1
+                elif self.is_jamo(token):
+                  if not self.is_excluded_jamo(token):
+                        user.initial_message_count += 1
 
-                user.message_count += 1  # 메시지 보낸 횟수 증가
-                self.user_chats[user_name] += message + ' '
-                self.total_chats.append(message)
+            user.message_count += 1  # 메시지 보낸 횟수 증가
+            self.user_chats[user_name] += message + ';'
+            self.total_chats.append(message+';')
 
-                # # 언급 처리
-                # mentions = re.findall(r'@(\w+)', message) #한 라인에서 추출된 언급이름 저장하는 리스트 mentions
-                # for mentioned_name in mentions:
-                #     mentioned_name = mentioned_name.strip() #공백 제거
-                #     if mentioned_name in self.members:
-                #         self.members[mentioned_name].mentioned_count += 1 #언급된 사람 카운트 증가
-                #         user.mentionAnother_count += 1 #언급한 사람 카운드 증가
+            # # 언급 처리
+            # mentions = re.findall(r'@(\w+)', message) #한 라인에서 추출된 언급이름 저장하는 리스트 mentions
+            # for mentioned_name in mentions:
+            #     mentioned_name = mentioned_name.strip() #공백 제거
+            #     if mentioned_name in self.members:
+            #         self.members[mentioned_name].mentioned_count += 1 #언급된 사람 카운트 증가
+            #         user.mentionAnother_count += 1 #언급한 사람 카운드 증가
 
 
         # 개인별 메시지 저장 (오타 거른 상태로 저장)
@@ -107,9 +106,6 @@ class ChatRoom:
                     else:
                       # 파일에 저장
                       file.write(word + ' ')
-                file.write('\n')  # 각 메시지를 줄 단위로 구분
-
-
 
         # 오타 카운트 결과 출력
         print("오타 카운트:")
