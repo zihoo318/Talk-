@@ -1,7 +1,5 @@
 #########사용코드##########
-#워드클라우드를 위해 personal.txt, group.txt가 형태소 분석으로 인해 형태가 변하지 않고 오타만 거른 상태로 저장되도록 하기 위한
-#언급 카운트 추가
-#랭킹 정보들 분리(주석처리함)
+#오타처리 방식 바꿈
 
 import re
 from konlpy.tag import Okt
@@ -13,10 +11,8 @@ class User:
         self.typo_count = 0 #오타 횟수
         self.initial_message_count = 0  # 초성 사용 횟수
         self.message_count = 0  # 메시지 보낸 횟수
-        #self.emoji_count = 0  # 이모티콘 횟수
+        self.emoji_count = 0  # 이모티콘 횟수(카톡 임티는 포함X)
         self.personal_file_path = f'/content/{self.name}_personal.txt'  # 개인 파일 경로 초기화
-        #self.mentioned_count=0 #본인이 언급된 경우 카운트
-        #self.mentionAnother_count #다른 사람을 언급하는 경우 카운트
 
 class ChatRoom:
     def __init__(self, file_path):
@@ -27,7 +23,7 @@ class ChatRoom:
         self.total_chats = []
         self.okt = Okt()  # Okt 객체 생성
         self.group_file_path = '/content/group.txt'
-        self.excluded_jamo_set = {'ㅋ', 'ㅍ', 'ㅎ', 'ㅌ'}  # 제외할 자음 집합
+        self.excluded_jamo_set = {'ㅋ', 'ㅍ', 'ㅎ', 'ㅌ','ㅠ','ㅜ','큐','쿠','튜','투','퓨','푸','튵','큨','캬','컄','헝','엉','어'}  # 제외할 자모음 집합
 
     def extract_room_name(self):
         with open(self.file_path, 'r', encoding='utf-8') as file:
@@ -57,73 +53,121 @@ class ChatRoom:
 
             user = self.members[user_name]
 
-            # 형태소 분석 후 처리
-            tokens = self.okt.morphs(message)
+            # 오타 처리
+            tokens = message.split()
             for token in tokens:
-                if self.is_jamo_only(token):
-                    user.typo_count += 1
-                elif self.is_jamo(token):
-                  if not self.is_excluded_jamo(token):
-                        user.initial_message_count += 1
+                if not self.is_jamo_only(token): #특수기호,이모티콘 제거
+                    for char in token:
+                      if self.is_emoji(char):
+                        user.emoji_count += 1
+                    token=self.remove_emojis(token)
+                    token=self.remove_special_symbols(token)
+                    
+                result = self.classify_jamo_vowel(token)
+                if result == 0: #자모음 둘다
+                    check=self.okt.morphs(token)
+                    i=0
+                    for char in check:
+                      if not self.is_excluded_jamo(char):
+                        i+=1
+                    if i >= 3:
+                        user.typo_count += 1
+                        continue #오타확정
+                    else: 
+                      self.user_chats[user_name] += token+' '
+                      self.total_chats.append(token+' ')
+                elif result == 1: #자음만
+                    self.user_chats[user_name] += token+' '
+                    self.total_chats.append(token+' ')
+                    if not self.is_excluded_jamo(token):
+                      user.initial_message_count += 1
+                elif result == 2: #모음만
+                    if not self.is_excluded_jamo(token):
+                      user.typo_count += 1
+                      continue #오타확정
+                    else:
+                      self.user_chats[user_name] += token+' '
+                      self.total_chats.append(token+' ')
+                else:
+                  self.user_chats[user_name] += token+' '
+                  self.total_chats.append(token+' ')
 
             user.message_count += 1  # 메시지 보낸 횟수 증가
-            self.user_chats[user_name] += message + ';'
-            self.total_chats.append(message+';')
-
-            # # 언급 처리
-            # mentions = re.findall(r'@(\w+)', message) #한 라인에서 추출된 언급이름 저장하는 리스트 mentions
-            # for mentioned_name in mentions:
-            #     mentioned_name = mentioned_name.strip() #공백 제거
-            #     if mentioned_name in self.members:
-            #         self.members[mentioned_name].mentioned_count += 1 #언급된 사람 카운트 증가
-            #         user.mentionAnother_count += 1 #언급한 사람 카운드 증가
+            self.user_chats[user_name] += ';'
+            self.total_chats.append(';')
 
 
         # 개인별 메시지 저장 (오타 거른 상태로 저장)
         for user_name, chat in self.user_chats.items():
             user = self.members[user_name]
             with open(user.personal_file_path, 'w', encoding='utf-8') as file:
-                # 각 메시지를 공백을 기준으로 나누어 처리
-                words = chat.split()
-                for word in words:
-                    word_without_spaces = word.replace(' ', '')
-                    if self.is_jamo_only(word_without_spaces):
-                      # 오타가 있는 경우 처리하지 않고 건너뜁니다.
-                      continue
-                    else:
-                      # 파일에 저장
-                      file.write(word + ' ')
+                file.write(chat)
 
         # 전체 메시지 저장 (오타 거른 상태로 저장)
+        chat_string = ''.join(self.total_chats)
         with open(self.group_file_path, 'w', encoding='utf-8') as file:
-            for message in self.total_chats:
-                words = message.split()
-                for word in words:
-                    word_without_spaces = word.replace(' ', '')
-                    if self.is_jamo_only(word_without_spaces):
-                      # 오타가 있는 경우 처리하지 않고 건너뜁니다.
-                      continue
-                    else:
-                      # 파일에 저장
-                      file.write(word + ' ')
+            file.write(chat_string)
 
         # 오타 카운트 결과 출력
         print("오타 카운트:")
         for user_name, user in self.members.items():
             print(f"{user_name}: {user.typo_count}개")
 
+    def is_special_symbol(self, character):
+        """입력된 문자가 특수 기호인지 여부를 반환하는 함수"""
+        category = unicodedata.category(character)
+        if category.startswith('S') and not category.startswith('So'):
+            return True
+        else:
+            return False
+
+    def remove_special_symbols(self, word):
+        """특수 기호를 제거한 문자열을 반환하는 함수"""
+        result = []
+        for char in word:
+            if not self.is_special_symbol(char):
+                result.append(char)
+        return ''.join(result)
+
+    def is_emoji(self, character):
+        """입력된 문자가 이모티콘인지 여부를 반환하는 함수"""
+        category = unicodedata.category(character)
+        if category.startswith('So'):
+            return True
+        else:
+            return False
+
+    def remove_emojis(self, word):
+        """이모티콘을 제거한 문자열을 반환하는 함수"""
+        result = []
+        for char in word:
+            if not self.is_emoji(char):
+                result.append(char)
+        return ''.join(result)
+
+    def classify_jamo_vowel(self,word):
+        jamo_pattern = re.compile("[ㄱ-ㅎ]+")  # 자음 패턴
+        vowel_pattern = re.compile("[ㅏ-ㅣ]+")  # 모음 패턴
+    
+        has_jamo = bool(jamo_pattern.search(word))
+        has_vowel = bool(vowel_pattern.search(word))
+    
+        if has_jamo and has_vowel:
+            return 0  # 자음과 모음이 모두 있는 경우
+        elif has_jamo:
+            return 1  # 자음만 있는 경우
+        elif has_vowel:
+            return 2  # 모음만 있는 경우
+        else:
+            return -1  # 영어인 경우
+
     def is_jamo_only(self, word):
-        # 한글 자모음으로만 구성된 단어인지 체크
+        # 한글 외의 문자가 있는지 체크
         jamo_pattern = re.compile("[ㄱ-ㅎㅏ-ㅣ]+")
         return bool(jamo_pattern.fullmatch(word))
 
-    def is_jamo(self, word):
-        # 한글 자음으로만 구성된 단어인지 체크
-        jamo_pattern = re.compile("[ㄱ-ㅎ]+")
-        return bool(jamo_pattern.fullmatch(word))
-
     def is_excluded_jamo(self, word):
-        # 제외할 자음 또는 모음으로만 구성된 단어인지 체크
+        # 제외할 자음 또는 모음으로만 구성된 단어인지 체크(ㅋ큐ㅠ)
         return all(char in self.excluded_jamo_set for char in word)
 
     def get_member_count(self):
@@ -147,6 +191,27 @@ class ChatRoom:
 
     def get_group_file_path(self):
         return self.group_file_path
+
+    def rank_users_by_message_count(self):
+        message_counts = [(user.name, user.message_count) for user in self.members.values()]
+        message_counts.sort(key=lambda x: x[1], reverse=True)
+        return message_counts
+
+    def rank_users_by_typo_count(self):
+        typo_counts = [(user.name, user.typo_count) for user in self.members.values()]
+        typo_counts.sort(key=lambda x: x[1], reverse=True)
+        return typo_counts
+
+    def rank_users_by_initial_message_count(self):
+        initial_message_counts = [(user.name, user.initial_message_count) for user in self.members.values()]
+        initial_message_counts.sort(key=lambda x: x[1], reverse=True)
+        return initial_message_counts
+        
+    def rank_users_by_emoji_count(self):
+        """사용자의 이모티콘 개수에 따라 사용자들을 정렬하여 반환"""
+        emoji_counts = [(user.name, user.emoji_count) for user in self.members.values()]
+        emoji_counts.sort(key=lambda x: x[1], reverse=True)
+        return emoji_counts
 
 # 파일 경로 설정
 file_path = '/content/KakaoTalk.txt'
