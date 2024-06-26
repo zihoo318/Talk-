@@ -1,6 +1,7 @@
 #########사용코드##########
 #워드클라우드를 위해 personal.txt, group.txt가 형태소 분석으로 인해 형태가 변하지 않고 오타만 거른 상태로 저장되도록 하기 위한
 #언급 카운트 추가
+#랭킹 정보들 분리(주석처리함)
 
 import re
 from konlpy.tag import Okt
@@ -12,10 +13,10 @@ class User:
         self.typo_count = 0 #오타 횟수
         self.initial_message_count = 0  # 초성 사용 횟수
         self.message_count = 0  # 메시지 보낸 횟수
-        self.emoji_count = 0  # 이모티콘 횟수
+        #self.emoji_count = 0  # 이모티콘 횟수
         self.personal_file_path = f'/content/{self.name}_personal.txt'  # 개인 파일 경로 초기화
-        self.mentioned_count=0 #본인이 언급된 경우 카운트
-        self.mentionAnother_count #다른 사람을 언급하는 경우 카운트
+        #self.mentioned_count=0 #본인이 언급된 경우 카운트
+        #self.mentionAnother_count #다른 사람을 언급하는 경우 카운트
 
 class ChatRoom:
     def __init__(self, file_path):
@@ -70,13 +71,13 @@ class ChatRoom:
                 self.user_chats[user_name] += message + ' '
                 self.total_chats.append(message)
 
-                # 언급 처리
-                mentions = re.findall(r'@(\w+)', message) #한 라인에서 추출된 언급이름 저장하는 리스트 mentions
-                for mentioned_name in mentions:
-                    mentioned_name = mentioned_name.strip() #공백 제거
-                    if mentioned_name in self.members:
-                        self.members[mentioned_name].mentioned_count += 1 #언급된 사람 카운트 증가
-                        user.mentionAnother_count += 1 #언급한 사람 카운드 증가
+                # # 언급 처리
+                # mentions = re.findall(r'@(\w+)', message) #한 라인에서 추출된 언급이름 저장하는 리스트 mentions
+                # for mentioned_name in mentions:
+                #     mentioned_name = mentioned_name.strip() #공백 제거
+                #     if mentioned_name in self.members:
+                #         self.members[mentioned_name].mentioned_count += 1 #언급된 사람 카운트 증가
+                #         user.mentionAnother_count += 1 #언급한 사람 카운드 증가
 
 
         # 개인별 메시지 저장 (오타 거른 상태로 저장)
