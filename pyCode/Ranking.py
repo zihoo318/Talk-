@@ -59,7 +59,7 @@ def count_mentions(chat_room):
     mentioned_counts = dict(sorted(mentioned_counts.items(), key=lambda item: item[1], reverse=True))
 
     return mention_counts, mentioned_counts
-  
+
 mention, mentioned = count_mentions(chat_room)
 print("\n언급한 횟수:", mention)
 print("언급된 횟수:", mentioned)
@@ -120,7 +120,7 @@ def count_emojis(chat_room):
     # emoji_count와 sorted_emoji_counts를 같은 키 값끼리 더해주기
     for name, count in basic_emoji_counts:
         if name in emoji_count:
-            emoji_count[name] += count    
+            emoji_count[name] += count
     # 값에 따라 내림차순으로 정렬하여 리스트로 반환
     emoji_count = dict(sorted(emoji_count.items(), key=lambda item: item[1], reverse=True))
     return emoji_count
@@ -130,8 +130,72 @@ print("\n이모티콘 보낸 횟수:", emoji)
 
 
 #검색어 받아서 검색하는 함수 만들기
-# user_dict = {user_name: 0 for user_name in members}
-# for user_name in user_dict.keys():
-#     personal_file_path = chat_room.get_personal_file_path(user_name)
-#     with open(personal_file_path, 'r', encoding='utf-8') as file:
-#         message = file.read().split(';')
+def search_keyword_in_personal_files(chat_room, keyword):
+    members = chat_room.get_members()
+    search_results = defaultdict(int)
+
+    for user_name in members:
+        personal_file_path = chat_room.get_personal_file_path(user_name)
+        if not os.path.exists(personal_file_path):
+            continue
+
+        with open(personal_file_path, 'r', encoding='utf-8') as file:
+            messages = file.read().split(';')
+            for message in messages:
+                if keyword.strip() in message:
+                    search_results[user_name] += 1
+
+    # 결과를 횟수 기준으로 내림차순 정렬하여 반환
+    sorted_results = dict(sorted(search_results.items(), key=lambda item: item[1], reverse=True))
+    return sorted_results
+
+# 검색어 설정
+keyword = '삭제된 메시지입니다'
+# 검색 실행 및 결과 출력
+results = search_keyword_in_personal_files(chat_room, keyword)
+print("\n검색어 횟수 랭킹:")
+rank=1
+for user_name, count in results.items():
+    print(f"{rank}. {user_name}: {count}회")
+    rank += 1
+print(type(results))
+
+
+#메세지 평균 길이
+def calculate_average_message_length(chat_room):
+    user_average_lengths = {}
+    members = chat_room.get_members()
+
+    for user_name in members:
+        personal_file_path = chat_room.get_personal_file_path(user_name)
+
+        if os.path.exists(personal_file_path):
+            with open(personal_file_path, 'r', encoding='utf-8') as file:
+                content = file.read().split(';')
+
+            total_length = 0
+            num_messages = 0
+            for message in content:
+                message = message.strip()
+                if message:  # 빈 문자열이 아닌 경우에만 처리
+                    total_length += len(message)
+                    num_messages += 1
+
+            if num_messages > 0:
+                average_length = total_length / num_messages
+            else:
+                average_length = 0
+            #print(user_name,"전체 합:",total_length)
+            #print(user_name,"메세지 개수:",num_messages)
+            user_average_lengths[user_name] = average_length
+    
+    # 평균 길이 순으로 정렬
+    sorted_results = {user_name: user_average_lengths[user_name] for user_name, _ in message_count_ranking if user_name in user_average_lengths}
+    sorted_results = dict(sorted(sorted_results.items(), key=lambda item: item[1], reverse=True))
+    return sorted_results
+
+results=calculate_average_message_length(chat_room)
+# 결과 출력
+print("\n평균 메시지 길이 기준 랭킹:")
+for rank, (user_name, avg_length) in enumerate(results.items(), 1):
+    print(f"{rank}. {user_name}: {avg_length:.2f} 글자")
