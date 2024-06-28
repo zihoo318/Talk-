@@ -4,6 +4,7 @@
 import re
 from konlpy.tag import Okt
 from collections import defaultdict
+import unicodedata
 
 class User:
     def __init__(self, name):
@@ -24,6 +25,7 @@ class ChatRoom:
         self.okt = Okt()  # Okt 객체 생성
         self.group_file_path = '/content/group.txt'
         self.excluded_jamo_set = {'ㅋ', 'ㅍ', 'ㅎ', 'ㅌ','ㅠ','ㅜ','큐','쿠','튜','투','퓨','푸','튵','큨','캬','컄','헝','엉','어'}  # 제외할 자모음 집합
+        self.additional_special_symbols = set(';.,:/?!') # 제거할 특수 기호 목록
 
     def extract_room_name(self):
         with open(self.file_path, 'r', encoding='utf-8') as file:
@@ -54,18 +56,29 @@ class ChatRoom:
             user = self.members[user_name]
 
             # 오타 처리
-            tokens = message.split()
+            tokens = message.split() #공백 기준으로 나누기
             for token in tokens:
+                if self.contains_alphabet(token):
+                  #print("영어 제외: ",token)
+                  self.user_chats[user_name] += token+' '
+                  self.total_chats.append(token+' ')
+                  continue #영어는 판정 제외
                 if not self.is_jamo_only(token): #특수기호,이모티콘 제거
                     for char in token:
                       if self.is_emoji(char):
                         user.emoji_count += 1
                     token=self.remove_emojis(token)
                     token=self.remove_special_symbols(token)
-                    
+
+                #1차 판정
+                check = self.okt.morphs(token)
+                if len(check) > 5:
+                    user.typo_count += 1
+                    #print("1차판정으로 오타:",token)
+                    continue #오타확정
+                #2차 판정
                 result = self.classify_jamo_vowel(token)
                 if result == 0: #자모음 둘다
-                    check=self.okt.morphs(token)
                     i=0
                     for char in check:
                       if not self.is_excluded_jamo(char):
@@ -73,21 +86,21 @@ class ChatRoom:
                     if i >= 3:
                         user.typo_count += 1
                         continue #오타확정
-                    else: 
+                    else:
                       self.user_chats[user_name] += token+' '
                       self.total_chats.append(token+' ')
                 elif result == 1: #자음만
-                    self.user_chats[user_name] += token+' '
-                    self.total_chats.append(token+' ')
                     if not self.is_excluded_jamo(token):
                       user.initial_message_count += 1
+                      self.user_chats[user_name] += token+' '
+                      self.total_chats.append(token+' ')
                 elif result == 2: #모음만
                     if not self.is_excluded_jamo(token):
                       user.typo_count += 1
                       continue #오타확정
-                    else:
-                      self.user_chats[user_name] += token+' '
-                      self.total_chats.append(token+' ')
+                    # else:
+                    #   self.user_chats[user_name] += token+' '
+                    #   self.total_chats.append(token+' ')
                 else:
                   self.user_chats[user_name] += token+' '
                   self.total_chats.append(token+' ')
@@ -116,7 +129,7 @@ class ChatRoom:
     def is_special_symbol(self, character):
         """입력된 문자가 특수 기호인지 여부를 반환하는 함수"""
         category = unicodedata.category(character)
-        if category.startswith('S') and not category.startswith('So'):
+        if (category.startswith('S') and not category.startswith('So')) or character in self.additional_special_symbols:
             return True
         else:
             return False
@@ -148,10 +161,10 @@ class ChatRoom:
     def classify_jamo_vowel(self,word):
         jamo_pattern = re.compile("[ㄱ-ㅎ]+")  # 자음 패턴
         vowel_pattern = re.compile("[ㅏ-ㅣ]+")  # 모음 패턴
-    
+
         has_jamo = bool(jamo_pattern.search(word))
         has_vowel = bool(vowel_pattern.search(word))
-    
+
         if has_jamo and has_vowel:
             return 0  # 자음과 모음이 모두 있는 경우
         elif has_jamo:
@@ -162,13 +175,21 @@ class ChatRoom:
             return -1  # 영어인 경우
 
     def is_jamo_only(self, word):
-        # 한글 외의 문자가 있는지 체크
+        # 자음 또는 모음으로만 있는지 체크
         jamo_pattern = re.compile("[ㄱ-ㅎㅏ-ㅣ]+")
         return bool(jamo_pattern.fullmatch(word))
 
     def is_excluded_jamo(self, word):
         # 제외할 자음 또는 모음으로만 구성된 단어인지 체크(ㅋ큐ㅠ)
         return all(char in self.excluded_jamo_set for char in word)
+
+    def contains_alphabet(self, text):
+        """문자열에 영어 알파벳 문자가 포함되어 있는지 여부를 반환하는 함수"""
+        for char in text:
+            if 'a' <= char <= 'z' or 'A' <= char <= 'Z':
+                return True
+        return False
+
 
     def get_member_count(self):
         return len(self.members)
@@ -206,7 +227,7 @@ class ChatRoom:
         initial_message_counts = [(user.name, user.initial_message_count) for user in self.members.values()]
         initial_message_counts.sort(key=lambda x: x[1], reverse=True)
         return initial_message_counts
-        
+
     def rank_users_by_emoji_count(self):
         """사용자의 이모티콘 개수에 따라 사용자들을 정렬하여 반환"""
         emoji_counts = [(user.name, user.emoji_count) for user in self.members.values()]
@@ -214,7 +235,7 @@ class ChatRoom:
         return emoji_counts
 
 # 파일 경로 설정
-file_path = '/content/KakaoTalk.txt'
+file_path = '/content/KakaoTalk_20240624_2306_01_181_group.txt'
 
 # ChatRoom 객체 생성 및 분석 수행
 chat_room = ChatRoom(file_path)
